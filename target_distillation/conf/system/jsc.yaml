@@ -1,0 +1,3 @@
+name: juwels
+db_root: /p/fastdata/fs/westai-upb/awerning/db
+storage_root: /p/project/westai-upb/awerning/storage

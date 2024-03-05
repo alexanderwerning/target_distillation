@@ -1,0 +1,29 @@
+num_classes: 527
+sample_rate: 32000
+loader:
+  _target_: distillation.data.blend_dataset.AudiosetLogitsDataloader
+  batch_size: ${loader.batch_size}
+  num_workers: ${loader.batch_size}
+  audioset:
+    _target_: distillation.data.blend_dataset.AudiosetLogitsDataset
+    json_path: ${system.db_root}/audioset_logits_db/database.json
+    balance_classes: false
+    cache: false
+    audio_reader:
+      _target_: distillation.data.blend_dataset.AudioReaderSD
+      audioset_path: ${system.db_root}/audioset_32khz_flac_sd
+      clip_length: 5.0
+      sample_rate: ${db.sample_rate}
+      add_class_labels: false
+  esc50:
+    _target_: distillation.data.blend_dataset.Esc50LogitsDataset
+    esc50: 
+      _target_: distillation.data.blend_dataset.Esc50Provider
+      root_path: ${system.db_root}/esc50_32khz_wav_sd
+      validation_fold: 0
+  augmentation:
+    _target_: distillation.data.mix_dataset.Augmentation
+    gain_augment: 0
+    roll_axis: 1
+    shift: null
+    shift_range: 10000

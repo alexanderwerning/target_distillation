@@ -1,0 +1,3 @@
+num_classes: 527
+sample_rate: 32000
+name: audioset_logits

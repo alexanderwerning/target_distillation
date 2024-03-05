@@ -1,0 +1,3 @@
+name: noctua2
+db_root: /scratch/hpc-prf-nt1/awerning/db
+storage_root: /scratch/hpc-prf-nt1/awerning/storage

@@ -1,0 +1,52 @@
+defaults:
+  - db: audioset_logits_wds
+  - system: nt
+loader:
+  batch_size: 30
+  num_workers: 0
+feature_extractor:
+  _target_: EfficientAT.models.preprocess.AugmentMelSTFT
+  sr: ${db.sample_rate}
+  win_length: 800
+  hopsize: 320
+  n_mels: 128
+model:
+  _target_: target_distillation.model.DistillationModel
+  teacher: 
+    _target_: target_distillation.model_wrapper.ModelWrapper
+    model:
+      _target_: hear21passt.models.passt.get_model
+      arch: passt_s_kd_p16_128_ap486
+    weight_path: null
+  student:
+    _target_: target_distillation.model_wrapper.ModelWrapper
+    model:
+      _target_: EfficientAT.models.MobileNetV3.get_model
+      pretrained_name: mn10_im
+      width_mult: 1.0
+      num_classes: ${db.num_classes}
+  feature_extractor: ${feature_extractor}
+  label_loss_prop: 0.1
+trainer:
+  _target_: padertorch.contrib.aw.trainer.AutocastTrainer
+  autocast_enabled: false
+  model: ${model}
+  optimizer:
+    _target_: padertorch.contrib.aw.optimizer.AdamW
+    lr: 8e-4
+    gradient_clipping: 1.0
+    weight_decay: 0.0001
+  summary_trigger:
+   - 100
+   - "iteration"
+  checkpoint_trigger:
+   - 1000
+   - "iteration"
+  stop_trigger:
+   - ???
+   - "iteration"
+  storage_dir: null
+  virtual_minibatch_size: 1
+
+device: 0
+experiment_name: target_distillation
