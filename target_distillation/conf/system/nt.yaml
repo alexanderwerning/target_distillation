@@ -1,3 +1,4 @@
 name: nt
 db_root: /net/vol/werning/db
 storage_root: /net/vol/werning/storage
+json_root: /net/vol/werning/jsons
