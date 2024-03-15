@@ -6,19 +6,16 @@ from omegaconf import DictConfig, OmegaConf
 from padertorch.contrib.aw.utils import str_nested_shape_maybe
 
 import torch
-torch.multiprocessing.set_start_method('spawn')
-
-
-def get_train_set(cfg_db, cfg_loader):
-    return instantiate(cfg_db.loader).get_train_set()
     
 
-@hydra.main(version_base=None, config_path="conf", config_name="config")
+@hydra.main(version_base=None, config_path="conf", config_name="distill")
 def main(cfg: DictConfig):
     print(OmegaConf.to_yaml(cfg))
 
+    print("Instantiate dataset")
+    db = instantiate(cfg.db.loader)
     print("Get train set")
-    train_set = get_train_set(cfg.db, cfg.loader)
+    train_set = db.get_train_set()
     # train_set, validate_set = get_datasets()
     data_it = iter(train_set)
     for i in range(5):
@@ -26,4 +23,5 @@ def main(cfg: DictConfig):
         print(str_nested_shape_maybe(ex))
 
 if __name__ == "__main__":
+    torch.multiprocessing.set_start_method('spawn')
     main()

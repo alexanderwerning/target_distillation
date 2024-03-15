@@ -1,12 +1,13 @@
 num_classes: 527
-sample_rate: 16000
+sample_rate: 32000
+num_train_samples: 1833973
 loader:
-  _target_: target_distillation.data.audioset.AudiosetLogitsDataloader
-  audioset:
+  _target_: target_distillation.data.loader.LogitsDataloader
+  database:
     _target_: target_distillation.data.audioset.AudiosetLogitsDataset
     audio_reader:
-      _target_: target_distillation.data.audioset.AudioReaderWids
-      database_path: ${system.db_root}/wds/audioset
+      _target_: target_distillation.data.audioset.AudioReaderSD
+      database_path: ${system.db_root}/audioset_32khz_flac_sd
       clip_length: 10.0
       sample_rate: ${db.sample_rate}
     json_path: ${system.db_root}/relabeling/audioset_full/database.json

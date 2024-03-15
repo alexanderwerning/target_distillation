@@ -1,0 +1,16 @@
+num_classes: 50
+sample_rate: 32000
+num_train_samples: 1600
+loader:
+  _target_: target_distillation.data.loader.LogitsDataloader
+  database:
+    _target_: target_distillation.data.esc50.Esc50LogitsDataset
+    logit_file_esc50: ${system.db_root}/logits/esc50_ensemble_logits_full/database.json
+    root_path: ${system.db_root}/esc50_32khz_wav_sd
+    validation_fold: 1
+    folds: [1,2,3,4,5]
+  batch_size: ${loader.batch_size}
+  num_workers: ${loader.num_workers}
+  seed: 0
+  augmentation: null
+  

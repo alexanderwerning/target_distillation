@@ -2,7 +2,6 @@ from pathlib import Path
 
 import numpy as np
 import torch
-from torch import autocast
 
 
 class ModelWrapper(torch.nn.Module):

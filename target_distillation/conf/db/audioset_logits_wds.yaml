@@ -1,7 +1,7 @@
 num_classes: 527
 sample_rate: 16000
 loader:
-  _target_: target_distillation.data.loader.AudiosetLogitsWdsDataset
+  _target_: target_distillation.data.audioset.AudiosetLogitsWdsDataset
   batch_size: ${loader.batch_size}
   num_workers: ${loader.num_workers}
   json_path: ${system.db_root}/relabeling/audioset_full/database.json
