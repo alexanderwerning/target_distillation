@@ -33,6 +33,7 @@ def main(cfg: DictConfig):
 
     use `python ex_distill +trainer.ckpt_path="/path/to/ckpt.ckpt"` to continue training
     """
+
     print(OmegaConf.to_yaml(cfg))
 
     print("Get train set")
@@ -56,9 +57,15 @@ def main(cfg: DictConfig):
                             lr_schedule=torch.optim.lr_scheduler.LambdaLR(optimizer=optimizer, 
                                                                           lr_lambda=lr_schedule))
     trainer = instantiate(cfg.trainer)
+    if "ckpt_path" in cfg:
+        print("Resuming from checkpoint")
+        ckpt_path = cfg.ckpt_path
+    else:
+        ckpt_path = None
     trainer.fit(model,
                 train_set,
-                validate_set)
+                validate_set,
+                ckpt_path=ckpt_path)
 
 if __name__ == "__main__":
     main()
