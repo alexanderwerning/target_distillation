@@ -24,33 +24,30 @@ model:
       num_classes: ${db.num_classes}
   feature_extractor: ${feature_extractor}
   label_loss_prop: 0.1
+optimizer:
+  _target_: padertorch.contrib.aw.optimizer.AdamW
+  lr: 8e-4
+  gradient_clipping: 1.0
+  weight_decay: 0.0001
 trainer:
-  _target_: padertorch.contrib.aw.trainer.AutocastTrainer
-  autocast_enabled: false
-  model: ${model}
-  optimizer:
-    _target_: padertorch.contrib.aw.optimizer.AdamW
-    lr: ${lr}
-    gradient_clipping: 1.0
-    weight_decay: 0.0001
-  summary_trigger:
-   - 100
-   - "iteration"
-  checkpoint_trigger:
-   - 1000
-   - "iteration"
-  stop_trigger:
-   - "???"
-   - "iteration"
-  storage_dir: ${hydra:run.dir}
-  virtual_minibatch_size: 1
-lr: 8e-4
+  _target_: pytorch_lightning.Trainer
+  accelerator: "gpu"
+  num_nodes: 1
+  logger:
+    _target_: lightning.pytorch.loggers.TensorBoardLogger
+    save_dir: ${hydra:run.dir}
+    name: ${experiment_name}
+  strategy: ddp
+  # limit_train_batches: ${num_iterations}
+  precision: 32
+  max_epochs: ${epochs}
+  gradient_clip_val: 1.0
+  gradient_clip_algorithm: norm
 lr_schedule:
   warm_up_len: 0.04
   ramp_down_start: 0.4
   ramp_down_len: 0.475
   last_lr_value: 0.01
-epochs: null
+epochs: 100
 num_iterations: 167000
-device: 0
 experiment_name: target_distillation

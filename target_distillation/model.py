@@ -6,8 +6,152 @@ from pb_sed.evaluation import instance_based
 from sklearn import metrics
 from torch import autocast
 from torchvision.utils import make_grid
-import warnings
 from abc import ABC
+
+from collections import defaultdict
+import numpy as np
+import pytorch_lightning as L
+
+def _to_list(scalars):
+    if torch.is_tensor(scalars):
+        scalars = scalars.clone().cpu().data.numpy()
+    if isinstance(scalars, np.ndarray):
+        scalars = scalars.flatten().tolist()
+    if not isinstance(scalars, (list, tuple)):
+        assert np.isscalar(scalars)
+        scalars = [scalars]
+    return scalars
+
+def _detach(buffer):
+    if torch.is_tensor(buffer):
+        buffer = buffer.detach()
+    return buffer
+
+def empty_summary_dict():
+    return dict(
+        scalars=defaultdict(list),
+        histograms=defaultdict(list),
+        audios=dict(),
+        images=dict(),
+        texts=dict(),
+        figures=dict(),
+        timings=dict(),
+        buffers=defaultdict(list),
+        snapshots=dict()
+    )
+
+def update_summary(summary, review):
+        allowed_keys = {
+            # 'loss',  # The trainer moves the loss and losses to scalars
+            # 'losses',
+            'scalars',
+            'histograms',
+            'audios',
+            'images',
+            'texts',
+            'figures',
+            'buffers',
+            'snapshots'
+        }
+        redundant_keys = set(review.keys()) - allowed_keys
+        assert len(redundant_keys) == 0, (redundant_keys, review.keys(), allowed_keys)
+
+        assert len(review) >= 1, review
+        popped_review = {**review}  # copy for "pop"
+
+        # note item is the pytorch function to get the value of a tensor
+        for key, scalars in popped_review.pop('scalars', dict()).items():
+            summary['scalars'][key].extend(_to_list(scalars))
+        for key, histogram in popped_review.pop('histograms', dict()).items():
+            summary['histograms'][key].extend(_to_list(histogram))
+            # do not hold more than 1M values in memory
+            summary['histograms'][key] = \
+                summary['histograms'][key][-1000000:]
+        for key, buffer in popped_review.pop('buffers', dict()).items():
+            summary['buffers'][key].append(_detach(buffer))
+        for key, snapshot in popped_review.pop('snapshots', dict()).items():
+            summary['snapshots'][key] = _detach(snapshot)  # snapshot
+        for key, audio in popped_review.pop('audios', dict()).items():
+            summary['audios'][key] = audio  # snapshot
+        for key, image in popped_review.pop('images', dict()).items():
+            summary['images'][key] = image  # snapshot
+        for key, figure in popped_review.pop('figures', dict()).items():
+            summary['figures'][key] = figure  # snapshot
+        for key, text in popped_review.pop('texts', dict()).items():
+            assert isinstance(text, str), text
+            summary['texts'][key] = text  # snapshot
+
+        assert len(popped_review) == 0, (popped_review, review)
+        return summary
+    
+
+class LightningModule(L.LightningModule):
+    def __init__(self, model, optimizer, lr_schedule=None):
+        super().__init__()
+        self.model = model
+        self.optimizer = optimizer
+        self.lr_schedule = lr_schedule
+        self.validation_summary = empty_summary_dict()
+    
+    def training_step(self, batch, batch_idx):
+        out = self.model(batch)
+        batch_size = batch['audio_data'].shape[0]
+        summary = self.model.review(batch, out)
+        self.log("training/lr",
+                 self.optimizer.param_groups[0]['lr'],
+                 rank_zero_only=True,
+                 batch_size=batch_size)
+        for k, v in summary['scalars'].items():
+            name = f"training/{k}"
+            self.log(name,
+                     v,
+                     rank_zero_only=True,
+                     batch_size=batch_size)
+        return summary['loss']
+    
+    def validation_step(self, batch, batch_idx):
+        out = self.model(batch)
+        batch_size = batch['audio_data'].shape[0]
+        summary = self.model.review(batch, out)
+        val_loss = summary['loss']
+        self.log("validation/loss",
+                 val_loss,
+                 sync_dist=True,
+                 batch_size=batch_size)
+        for k, v in summary['scalars'].items():
+            name = f"validation/{k}"
+            self.log(name,
+                     v,
+                     sync_dist=True,
+                     batch_size=batch_size)
+        if "loss" in summary:
+            summary.pop("loss")
+        update_summary(self.validation_summary, summary)
+    
+    def on_validation_epoch_end(self) -> None:
+        super().on_validation_epoch_end()
+        summary = _modify_summary(self.model, self.validation_summary)
+
+        if "loss" in summary['scalars']:
+            summary['scalars'].pop("loss")
+        self.validation_summary = empty_summary_dict()
+        for k, v in summary['scalars'].items():
+            if isinstance(v, list):
+                continue
+            name = f"validation/{k}"
+            self.log(name,
+                     v,
+                     sync_dist=True)
+
+    
+    def configure_optimizers(self):
+        d = {
+            "optimizer": self.optimizer,
+        }
+        if self.lr_schedule is not None:
+            d["lr_scheduler"] = self.lr_schedule
+        return d
+
 
 def _add_metrics_to_summary(self, summary, suffix):
     y = np.concatenate(summary["buffers"].pop(f"y_{suffix}"))

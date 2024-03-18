@@ -1,71 +1,64 @@
 """Reproduce the results of the paper "Efficient Large-Scale Audio Tagging Via Transformer-To-CNN Knowledge Distillation"""
 # distill knowledge from strong teacher to efficient student
-from pathlib import Path
-
 import hydra
 import torch
 from hydra.utils import instantiate
 from omegaconf import DictConfig, OmegaConf
-from padertorch.contrib.aw.name_generator import default_name_generator
-from target_distillation.lr_schedule import apply_lr_schedule, get_total_iterations
 
+from target_distillation.data.loader import LogitsDataloader
+from target_distillation.lr_schedule import linear_warmup_linear_down
+
+torch.set_float32_matmul_precision('high') # 'medium'
+
+from target_distillation.model import LightningModule
+
+def get_schedule(num_epochs, config):
+    warm_up_len = config["warm_up_len"]
+    ramp_down_start = config["ramp_down_start"]
+    ramp_down_len = config["ramp_down_len"]
+    last_lr_value = config["last_lr_value"]
+
+    warm_up_len = int(num_epochs * warm_up_len)
+    ramp_down_start = int(num_epochs * ramp_down_start)
+    ramp_down_len = int(num_epochs * ramp_down_len)
+
+    sched_fn = linear_warmup_linear_down(
+        warm_up_len, ramp_down_start, ramp_down_len, last_lr_value
+    )
+    return sched_fn
 
 @hydra.main(version_base=None, config_path="conf", config_name="distill")
 def main(cfg: DictConfig):
+    """Run training
+
+    use `python ex_distill +trainer.ckpt_path="/path/to/ckpt.ckpt"` to continue training
+    """
     print(OmegaConf.to_yaml(cfg))
-    # setup training time
-    actual_batch_size = cfg.loader.batch_size  * cfg.trainer.virtual_minibatch_size
-    cfg.trainer.stop_trigger[0] = int(100_000 * 200 / actual_batch_size)
-
-    # if cfg.trainer.storage_dir is None:
-        # stage 1
-        # group_name = default_name_generator()
-        # cfg.trainer.storage_dir = Path(cfg.system.storage_root)/cfg.experiment_name/group_name
-
-    print(f"storage_dir: {cfg.trainer.storage_dir}")
-
-    print("Instantiate trainer")
-    trainer = instantiate(cfg.trainer)
-
-    # if compile and hasattr(torch, "compile"):
-    #     if hasattr(trainer.model, "net"):
-    #         trainer.model.net = torch.compile(trainer.model.net)
-    #     if hasattr(trainer.model, "student"):
-    #         trainer.model.student = torch.compile(trainer.model.student)
-    #     if hasattr(trainer.model, "teacher"):
-    #         trainer.model.teacher = torch.compile(trainer.model.teacher)
-    #     print("Compiled model")
-    # else:
-    #     print("Not compiling model")
 
     print("Get train set")
-    db = instantiate(cfg.db.loader)
-    train_set = db.get_train_set()
+    db: LogitsDataloader = instantiate(cfg.db.loader)
+    train_set = db.get_train_set(replacement=True, num_samples=20_000)
     validate_set = db.get_validate_set()
 
-    num_iterations = get_total_iterations(cfg.epochs, cfg.num_iterations, cfg.db.num_train_samples)
-    apply_lr_schedule(trainer, cfg.lr, num_iterations=num_iterations, **cfg.lr_schedule)
+    module = instantiate(cfg.model)
 
-    # # trainer.test_run(train_set, validate_set)
-
-    trainer.register_validation_hook(validate_set)
-    resume = (
-        trainer.checkpoint_dir.exists()
-        and (trainer.checkpoint_dir / "ckpt_latest.pth").exists()
-    )
-    if resume:
-        print(
-            f"Resuming training from {(trainer.checkpoint_dir/'ckpt_latest.pth')}"
-        )
-    print("Start training")
-    trainer.train(
-        train_set,
-        resume=resume,
-        device=cfg.device,
-        track_emissions=False,
+    # instantiate, set params
+    optimizer = torch.optim.AdamW(
+        lr=cfg.optimizer.lr,
+        weight_decay=cfg.optimizer.lr,
+        params = module.parameters()
     )
 
+    lr_schedule = get_schedule(num_epochs=cfg.epochs, config=cfg.lr_schedule)
+
+    model = LightningModule(module,
+                            optimizer,
+                            lr_schedule=torch.optim.lr_scheduler.LambdaLR(optimizer=optimizer, 
+                                                                          lr_lambda=lr_schedule))
+    trainer = instantiate(cfg.trainer)
+    trainer.fit(model,
+                train_set,
+                validate_set)
 
 if __name__ == "__main__":
-    torch.multiprocessing.set_start_method('spawn')
     main()
