@@ -1,13 +1,25 @@
 num_classes: 527
-sample_rate: 16000
+sample_rate: 32000
 loader:
-  _target_: target_distillation.data.audioset.AudiosetLogitsWdsDataset
+  _target_: target_distillation.data.loader.LogitsDataloader
+  database:
+    _target_: target_distillation.data.audioset.AudiosetLogitsWdsDataset
+    json_path: ${system.db_root}/relabeling/audioset_full/database.json
+    balance_classes: false
+    cache: false
+    clip_length: 10.0
+    sample_rate: ${db.sample_rate}
+    dataset_path: ${system.db_root}/wds/audioset_32khz
   batch_size: ${loader.batch_size}
   num_workers: ${loader.num_workers}
-  json_path: ${system.db_root}/relabeling/audioset_full/database.json
-  balance_classes: false
-  load_weak_targets_from_file: false
-  cache: false
-  clip_length: 10.0
-  sample_rate: ${db.sample_rate}
-  dataset_path: ${system.db_root}/wds/audioset
+  seed: 0
+  augmentation: 
+    _target_: target_distillation.data.utils.Augmentation
+    gain_augment: 0
+    roll_axis: 1
+    shift: null
+    shift_range: 10000
+  mixup:
+    _target_: target_distillation.data.utils.Mixup
+    mix_interval: 2.0
+    mix_beta: 2.0

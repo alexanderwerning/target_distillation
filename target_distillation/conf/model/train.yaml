@@ -1,0 +1,5 @@
+defaults:
+  - arch@net: mobilenet
+
+_target_: target_distillation.model.Model
+feature_extractor: ${feature_extractor}

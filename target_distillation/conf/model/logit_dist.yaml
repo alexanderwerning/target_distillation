@@ -1,0 +1,6 @@
+defaults:
+  - arch@student: mobilenet
+
+_target_: target_distillation.model.LogitDistillationModel
+feature_extractor: ${feature_extractor}
+label_loss_prop: 0.1

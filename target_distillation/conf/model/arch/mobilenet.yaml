@@ -1,0 +1,7 @@
+_target_: target_distillation.model_wrapper.ModelWrapper
+model:
+  _target_: EfficientAT.models.MobileNetV3.get_model
+  # mn40_im
+  pretrained_name: null
+  width_mult: 4.0
+  num_classes: ${db.num_classes}

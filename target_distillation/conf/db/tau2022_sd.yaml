@@ -1,0 +1,15 @@
+num_classes: 10
+sample_rate: 32000
+num_train_samples: 139620
+loader:
+  _target_: target_distillation.data.loader.LogitsDataloader
+  database:
+    _target_: target_distillation.data.tau2022.Tau2022Dataset
+    root_path: ${system.db_root}/tau2022_32khz_sd
+    validation_set: test
+    train_set: train_100
+  batch_size: ${loader.batch_size}
+  num_workers: ${loader.num_workers}
+  seed: 0
+  augmentation: null
+  

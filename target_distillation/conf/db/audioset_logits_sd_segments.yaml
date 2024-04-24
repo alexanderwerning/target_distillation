@@ -8,9 +8,9 @@ loader:
     audio_reader:
       _target_: target_distillation.data.audioset.AudioReaderSD
       database_path: ${system.db_root}/audioset_32khz_flac_sd
-      clip_length: 10.0
+      clip_length: 5.0
       sample_rate: ${db.sample_rate}
-    json_path: ${system.db_root}/relabeling/audioset_full/database.json
+    json_path: ${system.db_root}/relabeling/domain_classifier3/database.json
     balance_classes: false
     cache: false
   batch_size: ${loader.batch_size}
