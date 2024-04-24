@@ -1,10 +1,10 @@
 from dataclasses import dataclass
+from typing import Optional
+
 import lazy_dataset
 from distillation.data.linked_json import LinkedJsonDatabase
-from typing import Optional
 from nt_paths import db_root
 from streaming_dataset.dataset import PickleDatabase
-from dataclasses import dataclass
 
 
 class Esc50PickleDatabase(PickleDatabase):
@@ -32,10 +32,16 @@ class Esc50Dataset:
         self.db = Esc50PickleDatabase(
             json_path=self.root_path + "/database.json", root_dir=self.root_path
         )
-
-    def get_dataset_fold(self, fold):
+    
+    def _fold_to_name(self, fold_idx):
         # folds: ["fold01", "fold02", "fold03", "fold04", "fold05"]
-        ds_name = f"fold0{fold}"
+        return f"fold0{fold_idx}"
+    
+    def get_dataset_names(self):
+        return [self._fold_to_name(i) for i in self.folds]
+
+    def get_dataset(self, fold):
+        ds_name = self._fold_to_name(fold)
         ds = self.db.get_dataset(
             ds_name,
         )
@@ -45,14 +51,14 @@ class Esc50Dataset:
         train_folds = [f for f in self.folds if f != self.validation_fold]
         ds = []
         for train_fold in train_folds:
-            fold = self.get_dataset_fold(train_fold)
+            fold = self.get_dataset(train_fold)
             ds.extend(fold)
 
         ds = lazy_dataset.from_list(list(ds), immutable_warranty="wu")
         return ds
 
     def get_validate_set(self):
-        ds = self.get_dataset_fold(self.validation_fold)
+        ds = self.get_dataset(self.validation_fold)
         ds = lazy_dataset.from_list(list(ds), immutable_warranty="wu")
         return ds
 
@@ -67,8 +73,8 @@ class Esc50LogitsDataset(Esc50Dataset):
         super().__post_init__()
         self.logit_db = LinkedJsonDatabase(self.logit_file_esc50)
 
-    def get_dataset_fold(self, fold):
-        ds = super().get_dataset_fold(fold)
+    def get_dataset(self, fold):
+        ds = super().get_dataset(fold)
         data = []
         fold_name = f"fold0{fold}"
         logit_fold_ds = self.logit_db.get_dataset(fold_name)
