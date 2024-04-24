@@ -12,6 +12,8 @@ from collections import defaultdict
 import numpy as np
 import pytorch_lightning as L
 
+from lightning.pytorch.utilities import grad_norm
+
 def _to_list(scalars):
     if torch.is_tensor(scalars):
         scalars = scalars.clone().cpu().data.numpy()
@@ -152,6 +154,16 @@ class LightningModule(L.LightningModule):
             d["lr_scheduler"] = self.lr_schedule
         return d
 
+    def on_before_optimizer_step(self, optimizer):
+        # Compute the 2-norm for each layer
+        # If using mixed precision, the gradients are already unscaled here
+        total_norm = 0
+        for p in self.parameters():
+            param_norm = p.grad.data.norm(2)
+            total_norm += param_norm.item() ** 2
+        total_norm = total_norm ** (1. / 2)
+        self.log("training/grad_norm", total_norm, rank_zero_only=True)
+
 
 def _add_metrics_to_summary(self, summary, suffix):
     y = np.concatenate(summary["buffers"].pop(f"y_{suffix}"))
@@ -171,29 +183,34 @@ def _add_metrics_to_summary(self, summary, suffix):
                 if self.label_mapping is not None:
                     event_class = self.label_mapping[event_class]
                 summary["scalars"][f"z/{key}/{event_class}"] = value
+    
+    if targets.ndim == 2:
+        _, f, p, r = instance_based.get_best_fscore_thresholds(targets, y)
+        summary["scalars"][f"macro_fscore_{suffix}"] = f.mean()
+        maybe_add_label_wise(f"fscore_{suffix}", f)
 
-    _, f, p, r = instance_based.get_best_fscore_thresholds(targets, y)
-    summary["scalars"][f"macro_fscore_{suffix}"] = f.mean()
-    maybe_add_label_wise(f"fscore_{suffix}", f)
+        _, er, ir, dr = instance_based.get_best_er_thresholds(targets, y)
+        summary["scalars"][f"macro_error_rate_{suffix}"] = er.mean()
+        maybe_add_label_wise(f"error_rate_{suffix}", er)
 
-    _, er, ir, dr = instance_based.get_best_er_thresholds(targets, y)
-    summary["scalars"][f"macro_error_rate_{suffix}"] = er.mean()
-    maybe_add_label_wise(f"error_rate_{suffix}", er)
+        lwlrap, per_class_lwlrap, weight_per_class = instance_based.lwlrap(targets, y)
+        summary["scalars"][f"lwlrap_{suffix}"] = lwlrap
+        maybe_add_label_wise(f"lwlrap_{suffix}", per_class_lwlrap)
 
-    lwlrap, per_class_lwlrap, weight_per_class = instance_based.lwlrap(targets, y)
-    summary["scalars"][f"lwlrap_{suffix}"] = lwlrap
-    maybe_add_label_wise(f"lwlrap_{suffix}", per_class_lwlrap)
+        if (targets.sum(0) > 1).all():
+            ap = metrics.average_precision_score(targets, y, average=None)
+            summary["scalars"][f"map_{suffix}"] = np.mean(ap)
+            maybe_add_label_wise(f"ap_{suffix}", ap)
 
-    if (targets.sum(0) > 1).all():
-        ap = metrics.average_precision_score(targets, y, average=None)
-        summary["scalars"][f"map_{suffix}"] = np.mean(ap)
-        maybe_add_label_wise(f"ap_{suffix}", ap)
+            auc = metrics.roc_auc_score(targets, y, average=None)
+            summary["scalars"][f"mauc_{suffix}"] = np.mean(auc)
+            maybe_add_label_wise(f"auc_{suffix}", auc)
 
-        auc = metrics.roc_auc_score(targets, y, average=None)
-        summary["scalars"][f"mauc_{suffix}"] = np.mean(auc)
-        maybe_add_label_wise(f"auc_{suffix}", auc)
-
-        top1acc = (y.argmax(-1) == targets.argmax(-1)).mean()
+        if (targets.sum(0) > 1).all():
+            top1acc = (y.argmax(-1) == targets.argmax(-1)).mean()
+            summary["scalars"][f"top1acc_{suffix}"] = top1acc
+    else:
+        top1acc = (y.argmax(-1) == targets).mean()
         summary["scalars"][f"top1acc_{suffix}"] = top1acc
     return summary
 
@@ -254,9 +271,19 @@ class Model(pt.Model):
 
     def compute_loss(self, inputs, outputs):
         logits, feats, mel_spec = outputs
-        targets = inputs["weak_targets"]
-        if isinstance(self.loss_fn, torch.nn.CrossEntropyLoss) and targets.dim() == 2:
-            targets = torch.argmax(targets, dim=-1).long()
+        targets = None
+        if "weak_targets" in inputs:
+            targets = inputs["weak_targets"]
+        if isinstance(self.loss_fn, torch.nn.CrossEntropyLoss):
+            if "target" not in inputs:
+                if targets is not None and targets.dim() == 2:
+                    targets = torch.argmax(targets, dim=-1).long()
+                else:
+                    raise ValueError("Target (index) is missing, add 'target' or 'weak_targets' keys")
+            else:
+                targets = inputs["target"]
+        if targets is None:
+            raise ValueError("Missing 'weak_targets' key")
         loss = self.loss_fn(logits, targets)
 
         # scalars
@@ -265,22 +292,27 @@ class Model(pt.Model):
                 "loss": loss,
             },
         }
-        return loss, summary
+        return targets, loss, summary
 
     def review(self, inputs, outputs):
-        loss, loss_summary = self.compute_loss(inputs, outputs)
+        targets, loss, loss_summary = self.compute_loss(inputs, outputs)
         logits = outputs[0]
         mel_spec = outputs[-1]
 
-        targets = inputs["weak_targets"]
         labeled_examples_idx = (
             ((targets < 0.00001) + (targets > 0.99999)).detach().cpu().numpy() == 1
-        ).all(-1)
+        )
+        if labeled_examples_idx.ndim == 2:
+            labeled_examples_idx = labeled_examples_idx.all(-1)
         y_weak = logits.detach().cpu().numpy()[labeled_examples_idx]
         weak_targets = targets.detach().cpu().numpy()[labeled_examples_idx]
+        if weak_targets.ndim == 2:
+            top1acc = (y_weak.argmax(-1) == weak_targets.argmax(-1)).mean()
+        else:
+            top1acc = (y_weak.argmax(-1) == weak_targets).mean()
         summary = {
             "loss": loss,
-            "scalars": {},
+            "scalars": {"top1acc_weak": top1acc},
             "images": {
                 "features": mel_spec[:3].detach().cpu(),  # .numpy(),
             },
