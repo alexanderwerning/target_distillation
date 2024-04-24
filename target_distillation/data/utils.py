@@ -1,10 +1,10 @@
-import random
 import math
 import torch
 import numpy as np
 from typing import Dict, Union, List, Tuple, Optional
 import lazy_dataset
 from dataclasses import dataclass
+from dcase2024_task1_baseline.helpers.utils import mixstyle
 
 ## batching/loading
 
@@ -21,6 +21,7 @@ def collate_element(element_list):
     else:
         return element_list
 
+
 def collation_fn(batch_list):
     if isinstance(batch_list[0], dict):
         batch = {}
@@ -34,18 +35,17 @@ def collation_fn(batch_list):
             batch.append(collate_element(element_list))
     return batch
 
-
 ## example handling/processing
 
 def build_targets(event_ids, num_events=527):
-    targets = np.zeros(num_events)
+    targets = torch.zeros(num_events, dtype=int)
     for ev_id in event_ids:
         targets[ev_id] = 1
     return targets
 
 class Preprocessing:
-    def __init__(self, device, example_len, class_mapping, num_classes, logit_dict, target_key="weak_targets"):
-        self.device = device
+    def __init__(self, example_len, class_mapping, num_classes, logit_dict, target_key="weak_targets"):
+        # self.device = device
         self.example_len = example_len
         self.class_mapping = class_mapping
         self.num_classes = num_classes
@@ -57,7 +57,7 @@ class Preprocessing:
         # meta: {"text": caption, "original_data": {"class_labels": [str,...], "class_names": [str,...]}}
         class_names = meta["original_data"]["class_names"]
         class_indices = [self.class_mapping[c] for c in class_names]
-        targets = torch.zeros(self.num_classes, device=self.device)
+        targets = torch.zeros(self.num_classes)
         for idx in class_indices:
             targets[idx] = 1
         example_id = key.rsplit("/", maxsplit=1)[-1]
@@ -72,22 +72,22 @@ class Preprocessing:
         #     logits = self.logit_dict[random.choice(splits)]['logits']
         # else:
         #     logits = self.logit_dict[splits[0]]['logits']
-        logits = self.logit_dict[example_id]['logits']
-
+        logits = torch.as_tensor(self.logit_dict[example_id]['logits'])
 
         # fix this using bucketing
         if self.example_len is not None:
-            audio_data_cut_padded = torch.zeros(1, self.example_len, device=self.device)
+            audio_data_cut_padded = torch.zeros(1, self.example_len)
             if audio_data.shape[1] >= self.example_len:
                 audio_data_cut_padded[:] = audio_data[:, :self.example_len]
             else:
                 audio_data_cut_padded[:, :audio_data.shape[1]] = audio_data
         else:
             audio_data_cut_padded = audio_data
-        audio_data_cut_padded = audio_data_cut_padded.to(self.device)
         # todo: also give sequence lengths -> only compute loss for non-padded signal
 
         example = {
+            "__key__": example_id,  # map adds __key__ anyways, avoid None value
+            "example_id": example_id,
             "logits": logits,
             self.target_key: targets,
             "audio_data": audio_data_cut_padded
@@ -100,25 +100,28 @@ class Augmentation:
     roll_axis: int = 1
     shift: Optional[int] = None
     shift_range: int = 10000
-    seed: int = 0
-
-    def __post_init__(self):
-        self.rng = np.random.RandomState(self.seed)   
+    mixstyle_p: bool = 0
+    mixstyle_alpha: bool = 0
 
     def roll_fn(self, x):
         # roll waveform (over time)
-        x = np.asarray(x)
         if self.shift is None:
-            sf = int(np.random.random_integers(-self.shift_range, self.shift_range))
+            if self.shift_range == 0:
+                return x
+            sf = torch.randint(-self.shift_range, self.shift_range, (1,)).item()
         else:
             sf = self.shift
-        return np.roll(x, sf, self.roll_axis)
+        if isinstance(x, torch.Tensor):
+            return torch.roll(x, sf, self.roll_axis)
+        else:
+            return np.roll(x, sf, self.roll_axis)
 
     def preprocess(self, ex, gain_augment, roll):
-        ex["audio_data"] = ex["audio_data"].reshape(1, -1)
-        ex["weak_targets"] = ex["weak_targets"].reshape(-1)
+        if self.mixstyle_p > 0:
+            ex["audio_data"] = mixstyle(ex["audio_data"], self.mixstyle_p, self.mixstyle_alpha)
+
         if gain_augment and self.gain_augment > 0:
-            gain = self.rng.randint(0, self.gain_augment * 2) - self.gain_augment
+            gain = torch.rand(1).item() * self.gain_augment * 2 - self.gain_augment
             amp = 10 ** (gain / 20)
             ex["audio_data"] = ex["audio_data"] * amp
 
@@ -134,7 +137,7 @@ def pad_or_truncate(audio_data, length):
     audio_len = audio_data.shape[-1]
     if audio_len < length:
         # pad
-        return np.pad(audio_data, ((0, 0), (0, length-audio_len)))
+        return torch.pad(audio_data, ((0, 0), (0, length-audio_len)))
     else:
         # truncate
         return audio_data[:, :length]
@@ -143,21 +146,32 @@ def pad_or_truncate(audio_data, length):
 class Mixup:
     mix_interval: float = 2.0
     mix_beta: float = 2.0
-    rng: np.random.RandomState = None
     mixup_ds: lazy_dataset.Dataset = None
 
+    def __post_init__(self):
+        self.ds_iter = None
+        self._dist = torch.distributions.beta.Beta(self.mix_beta, self.mix_beta)
+    
+    def _get_next(self):
+        if self.ds_iter is None:
+            self.ds_iter = iter(self.mixup_ds)
+        try:
+            return next(self.ds_iter)
+        except StopIteration:
+            self.ds_iter = iter(self.mixup_ds)
+            return next(self.ds_iter)
+
     def mixup_fn(self, ex):
-        if self.mix_interval is None or self.rng.rand() < 1 / self.mix_interval:
+        if self.mix_interval is None or torch.rand(1).item() < 1 / self.mix_interval:
             return ex
-        idx = self.rng.randint(len(self.mixup_ds))
-        ex2 = self.mixup_ds[idx]
-        l = np.random.beta(self.mix_beta, self.mix_beta)
+        ex2 = self._get_next()
+        l = self._dist.sample()
         l = max(l, 1.0 - l)
         ex["audio_data"] = ex["audio_data"] - ex["audio_data"].mean()
         ex2["audio_data"] = ex2["audio_data"] - ex2["audio_data"].mean()
         x = ex["audio_data"] * l + ex2["audio_data"] * (1.0 - l)
         x = x - x.mean()
-        target = np.maximum(ex["weak_targets"], ex["weak_targets"])
+        target = torch.maximum(ex["weak_targets"], ex["weak_targets"])
         new_ex = {
             "audio_data": x,
             "weak_targets": target,
@@ -249,38 +263,3 @@ def get_repetition_groups(ds: "lazy_dataset", num_classes: int) -> List[Tuple["l
         ds, label_reps
     )
     return repetition_groups
-
-
-## data loader
-
-
-# EfficientAT.helpers.init.spawn_get
-def spawn_get(seedseq, n_entropy, dtype):
-    child = seedseq.spawn(1)[0]
-    state = child.generate_state(n_entropy, dtype=np.uint32)
-
-    if dtype == np.ndarray:
-        return state
-    elif dtype == int:
-        state_as_int = 0
-        for shift, s in enumerate(state):
-            state_as_int = state_as_int + int((2 ** (32 * shift) * s))
-        return state_as_int
-    else:
-        raise ValueError(f'not a valid dtype "{dtype}"')
-
-
-# EfficientAT.helpers.init.worker_init_fn
-def worker_init_fn(wid):
-    seed_sequence = np.random.SeedSequence(
-        [torch.initial_seed(), wid]
-    )
-
-    to_seed = spawn_get(seed_sequence, 2, dtype=int)
-    torch.random.manual_seed(to_seed)
-
-    np_seed = spawn_get(seed_sequence, 2, dtype=np.ndarray)
-    np.random.seed(np_seed)
-
-    py_seed = spawn_get(seed_sequence, 2, dtype=int)
-    random.seed(py_seed)
