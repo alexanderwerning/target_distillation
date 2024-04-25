@@ -30,9 +30,9 @@ def cosine_down(ramp_down_start, ramp_down_len, last_lr_value):
         elif it >= ramp_down_start + ramp_down_len:
             return last_lr_value
         else:
-            return last_lr_value + (1.0 - last_lr_value) * math.cos(
-                math.pi/2*(it - ramp_down_start) / ramp_down_len
-            )
+            return last_lr_value + (1.0 - last_lr_value) * (0.5*(1+math.cos(
+                math.pi*(it - ramp_down_start) / ramp_down_len
+            )))
 
     return wrapper
 
