@@ -6,4 +6,4 @@ model:
   base_channels: 32
   channels_multiplier: 1.8
   expansion_rate: 2.1
-has_features: false
+  add_feats: true

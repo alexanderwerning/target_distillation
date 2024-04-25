@@ -1,6 +1,9 @@
 defaults:
   - arch@student: mobilenet
+  - arch@projection_layer: mobilenet_projection_layer
 
 _target_: target_distillation.model.LogitDistillationModel
 feature_extractor: ${feature_extractor}
 label_loss_prop: 0.1
+label_loss: 
+  _target_: torch.nn.CrossEntropyLoss
