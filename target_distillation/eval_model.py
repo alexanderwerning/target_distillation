@@ -32,15 +32,18 @@ def main(cfg):
         else:
             print(f"Missing 'state_dict' or 'model' keys in state dict, assume raw weights: {next(iter(trainer_state_dict.keys()))}")
             model_state_dict = trainer_state_dict
-        some_key = next(iter(model_state_dict))
         prefixes = ["student.model.", "net.model.",
-                    "model.student.model.", "model.net.model.", ""]
+                    "model.student.model.", "model.net.model.", "model.", ""]
         for p in prefixes:
-            if some_key.startswith(p):
-                student_key_prefix = p
+            for k in model_state_dict:
+                if k.startswith(p):
+                    student_key_prefix = p
+                    break
+            if k.startswith(p):
                 break
         else:
-            raise ValueError(f"Key prefix unknown: {some_key}")
+            raise ValueError(f"Key prefix unknown: {next(iter(model_state_dict))}")
+        print(f"Found prefix {p}")
         student_state_dict = {k[len(student_key_prefix):]: v for k, v in model_state_dict.items() if k.startswith(student_key_prefix)}
         
     db: LogitsDataloader = instantiate(cfg.db.loader)
