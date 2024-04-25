@@ -292,10 +292,10 @@ class Model(pt.Model):
                 "loss": loss,
             },
         }
-        return targets, loss, summary
+        return loss, targets, summary
 
     def review(self, inputs, outputs):
-        targets, loss, loss_summary = self.compute_loss(inputs, outputs)
+        loss, targets, loss_summary = self.compute_loss(inputs, outputs)
         logits = outputs[0]
         mel_spec = outputs[-1]
 
@@ -338,20 +338,24 @@ class Model(pt.Model):
 class AbstractDistillationModel(pt.Model, ABC):
 
     def review(self, inputs, outputs):
-        loss, loss_summary = self.compute_loss(inputs, outputs)
+        loss, targets, loss_summary = self.compute_loss(inputs, outputs)
         logits = outputs[0]
         mel_spec = outputs[-1]
 
-        targets = inputs["weak_targets"]
         labeled_examples_idx = (
             ((targets < 0.00001) + (targets > 0.99999)).detach().cpu().numpy() == 1
-        ).all(-1)
-
+        )
+        if labeled_examples_idx.ndim == 2:
+            labeled_examples_idx = labeled_examples_idx.all(-1)
         y_weak = logits.detach().cpu().numpy()[labeled_examples_idx]
         weak_targets = targets.detach().cpu().numpy()[labeled_examples_idx]
+        if weak_targets.ndim == 2:
+            top1acc = (y_weak.argmax(-1) == weak_targets.argmax(-1)).mean()
+        else:
+            top1acc = (y_weak.argmax(-1) == weak_targets).mean()
         summary = {
             "loss": loss,
-            "scalars": {},
+            "scalars": {"top1acc_weak": top1acc},
             "images": {
                 "features": mel_spec[:3].detach().cpu(),  # .numpy(),
             },
@@ -464,7 +468,7 @@ class DistillationModel(AbstractDistillationModel):
                 "label_loss": label_loss_value,
             },
         }
-        return loss, summary
+        return loss, targets, summary
         
 
 class LogitDistillationModel(AbstractDistillationModel):
@@ -481,6 +485,7 @@ class LogitDistillationModel(AbstractDistillationModel):
         label_loss_prop=0.1,
         kd_loss=torch.nn.BCEWithLogitsLoss(),
         label_loss=torch.nn.BCEWithLogitsLoss(),
+        projection_layer=None,
     ):
         """
         Args:
@@ -496,6 +501,8 @@ class LogitDistillationModel(AbstractDistillationModel):
 
         self.labelwise_metrics = ()
         self.label_mapping = None
+        self.projection_layer = projection_layer
+
 
         print(
             f"Student Parameters: {sum([p.numel() for p in self.student.parameters()])}"
@@ -512,9 +519,9 @@ class LogitDistillationModel(AbstractDistillationModel):
         except RuntimeError as e:
             print(batch["audio_data"].shape, float_input.shape)
             raise e
-        student_logits, _ = self.student(mel_spec)
+        student_logits, student_features = self.student(mel_spec)
 
-        return student_logits, mel_spec
+        return student_logits, student_features, mel_spec
 
 
     def predict(self, batch):
@@ -526,7 +533,7 @@ class LogitDistillationModel(AbstractDistillationModel):
         return pred
 
     def compute_loss(self, inputs, outputs):
-        student_logits, _ = outputs
+        student_logits, student_features, _ = outputs
 
         assert "logits" in inputs, inputs.keys()
         teacher_logits = inputs["logits"]
@@ -535,7 +542,7 @@ class LogitDistillationModel(AbstractDistillationModel):
         if isinstance(self.label_loss, nn.BCEWithLogitsLoss):
             targets = inputs["weak_targets"]
         elif isinstance(self.label_loss, nn.CrossEntropyLoss):
-            targets = inputs["target_idx"]
+            targets = inputs["target"]
         else:
             raise ValueError(f"Unknown label loss {self.label_loss}")
         
@@ -543,7 +550,10 @@ class LogitDistillationModel(AbstractDistillationModel):
 
         teacher_act = torch.sigmoid(teacher_logits)
 
-        kd_loss_value = self.kd_loss(student_logits, teacher_act)
+        if self.projection_layer is None:
+            kd_loss_value = self.kd_loss(student_logits, teacher_act)
+        else:
+            kd_loss_value = self.kd_loss(self.projection_layer(student_features).reshape(teacher_act.shape), teacher_act)
         loss = (
             1 - self.label_loss_prop
         ) * kd_loss_value + self.label_loss_prop * label_loss_value
@@ -554,4 +564,4 @@ class LogitDistillationModel(AbstractDistillationModel):
                 "label_loss": label_loss_value,
             },
         }
-        return loss, summary
+        return loss, targets, summary
