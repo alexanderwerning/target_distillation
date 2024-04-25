@@ -7,7 +7,7 @@ from hydra.utils import instantiate
 from omegaconf import DictConfig, OmegaConf
 
 from target_distillation.data.loader import LogitsDataloader
-from target_distillation.lr_schedule import linear_warmup_linear_down
+from target_distillation.lr_schedule import linear_warmup_linear_down, linear_warmup_cosine_down
 
 
 from target_distillation.model import LightningModule
@@ -22,7 +22,7 @@ def get_schedule(num_epochs, config):
     ramp_down_start = int(num_epochs * ramp_down_start)
     ramp_down_len = int(num_epochs * ramp_down_len)
 
-    sched_fn = linear_warmup_linear_down(
+    sched_fn = linear_warmup_cosine_down(
         warm_up_len, ramp_down_start, ramp_down_len, last_lr_value
     )
     return sched_fn
