@@ -1,3 +1,4 @@
+import math
 
 from dataclasses import dataclass
 from typing import List, Optional
@@ -8,18 +9,34 @@ import paderbox as pb
 from distillation.data.linked_json import LinkedJsonDatabase
 from nt_paths import db_root
 from streaming_dataset.dataset import PickleDatabase
+from pathlib import Path
+import webdataset as wds
 
+import torch
+
+# tau2022_classes = [
+#     "airport",
+#     "shopping_mall",
+#     "metro_station",
+#     "street_pedestrian",
+#     "public_square",
+#     "street_traffic",
+#     "tram",
+#     "bus",
+#     "metro",
+#     "park"
+# ]
 tau2022_classes = [
     "airport",
-    "shopping_mall",
-    "metro_station",
-    "street_pedestrian",
-    "public_square",
-    "street_traffic",
-    "tram",
     "bus",
     "metro",
-    "park"
+    "metro_station",
+    "park",
+    "public_square",
+    "shopping_mall",
+    "street_pedestrian",
+    "street_traffic",
+    "tram"
 ]
 
 from torch.utils.data import IterableDataset
@@ -122,3 +139,76 @@ class Tau2022LogitsDataset(Tau2022Dataset):
         ds = ds.map(add_logits)
 
         return ds
+
+class Preprocessing:
+    def __init__(self, class_mapping, num_classes, logit_dict, target_key="target"):
+        self.class_mapping = class_mapping
+        self.num_classes = num_classes
+        self.logit_dict = logit_dict
+        self.target_key = target_key
+    
+    def __call__(self, x):
+        example_id, (audio_data, sample_rate), meta = x
+        target = np.asarray(self.class_mapping[meta["label"]])
+        
+        logits = torch.as_tensor(self.logit_dict[example_id]['logits'])
+
+        example = {
+            "__key__": example_id,  # map adds __key__ anyways, avoid None value
+            "example_id": example_id,
+            "logits": logits,
+            self.target_key: target,
+            "audio_data": audio_data
+        }
+        return example
+
+
+@dataclass
+class Tau2022LogitsWdsDataset:
+    root_path: str = db_root + "/wds/tau2022_32khz"
+    logit_file: str = db_root + "/logits/tau2022_ensemble_logits_full/database.json"
+    validation_set: str = "test"
+    train_set: str = "train_100"
+    cache: bool = False
+
+    def __post_init__(self):
+        self.num_classes = len(tau2022_classes)
+        self.class_mapping = {cls: i for i, cls in enumerate(tau2022_classes)}
+        self.inverse_class_mapping = dict(enumerate(tau2022_classes))
+
+        self.db = LinkedJsonDatabase(self.logit_file).data["datasets"]
+
+    def get_train_shards(self):
+        train_path = Path(self.root_path) / self.train_set
+        return [str(p) for p in train_path.glob("*.tar")]
+
+    def get_validate_shards(self):
+        eval_path = Path(self.root_path) / self.validation_set
+        return [str(p) for p in eval_path.glob("*.tar")]
+
+    def get_dataset(self, input_shards):
+        logit_dict = {k: v for ds in self.db.values() for k, v in ds.items()}
+
+        ds = (
+            wds.WebDataset(input_shards, nodesplitter=wds.split_by_node)
+            .shuffle(100)
+            .decode(wds.torch_audio)
+            .to_tuple("__key__", "flac", "json")
+        )
+        if self.cache:
+            ds = ds.mcached()
+        ds = ds.map(
+            Preprocessing(
+                class_mapping=self.class_mapping,
+                num_classes=self.num_classes,
+                logit_dict=logit_dict,
+            )
+        )
+
+        return ds
+
+    def get_train_set(self):
+        return self.get_dataset(self.get_train_shards())
+
+    def get_validate_set(self):
+        return self.get_dataset(self.get_validate_shards())
