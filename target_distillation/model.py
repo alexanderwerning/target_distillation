@@ -159,6 +159,8 @@ class LightningModule(L.LightningModule):
         # If using mixed precision, the gradients are already unscaled here
         total_norm = 0
         for p in self.parameters():
+            if p.grad is None:
+                continue
             param_norm = p.grad.data.norm(2)
             total_norm += param_norm.item() ** 2
         total_norm = total_norm ** (1. / 2)
