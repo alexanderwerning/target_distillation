@@ -11,7 +11,7 @@ import webdataset as wds
 import wids
 from distillation.data.linked_json import LinkedJsonDatabase
 from lazy_dataset.database import JsonDatabase
-from nt_paths import db_root
+from nt_paths import db_root, json_root
 
 from target_distillation.data.utils import (
     Preprocessing,
@@ -255,7 +255,7 @@ class LogitFilter:
 class AudiosetLogitsWdsDataset:
     dataset_path: str = db_root + "/wds/audioset"
     json_path: str = db_root + "/audioset_logits_db/database.json"
-    class_file: str = "events/audioset_events.json"
+    class_file: str = json_root + "/events/audioset_events.json"
     balance_classes: bool = False
     cache: bool = False
     sample_rate: int = 16_000
@@ -273,16 +273,26 @@ class AudiosetLogitsWdsDataset:
 
         self.db = LinkedJsonDatabase(self.json_path).data["datasets"]
         self.example_len = int(self.clip_length * self.sample_rate)
+        # self.num_samples_ds = {}
+        # for ds_name in ["unbalanced_train", "balanced_train", "eval"]:
+        #     self.num_samples_ds[ds_name] = sum(pb.io.load(self.dataset_path/ds_name/"sizes.json").keys())
+        # self.num_train_samples = self.num_samples_ds["unbalanced_train"] + self.num_samples_ds["balanced_train"]
+    
+    def _get_subset_path(self, name):
+        path = Path(self.dataset_path) / name
+        if not (path/"0.tar").exists():
+            raise ValueError(f"shards not found: {path/'0.tar'}")
+        return path
 
     def get_train_shards(self):
-        balanced_train_path = Path(self.dataset_path) / "balanced_train"
-        unbalanced_train_path = Path(self.dataset_path) / "unbalanced_train"
+        balanced_train_path = self._get_subset_path("balanced_train")
+        unbalanced_train_path = self._get_subset_path("unbalanced_train")
         return [str(p) for p in balanced_train_path.glob("*.tar")] + [
             str(p) for p in unbalanced_train_path.glob("*.tar")
         ]
 
     def get_validate_shards(self):
-        eval_path = Path(self.dataset_path) / "eval"
+        eval_path = self._get_subset_path("eval")
         return [str(p) for p in eval_path.glob("*.tar")]
 
     def get_dataset(self, input_shards):

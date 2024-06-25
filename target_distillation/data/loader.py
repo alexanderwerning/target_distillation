@@ -25,6 +25,8 @@ class LogitsDataloader:
     seed: int = 0
     augmentation: Augmentation = None
     mixup: Mixup = None
+    train_drop_last: bool = False
+    persistent_workers: bool = True
 
     def _get_train_set(self, balance=False):
         ds = self.database.get_train_set()
@@ -45,6 +47,9 @@ class LogitsDataloader:
 
     def get_train_set(self, balance=False, replacement=False, num_samples=None, generator=None):
         ds = self._get_train_set(balance=balance)
+        # pytorch lightning will add distributed sampler here automatically
+        # https://pytorch-lightning.readthedocs.io/en/0.9.0/multi_gpu.html#remove-samplers
+        ds = IterableDatasetWrapper(ds)
         if num_samples is not None:
             sampler = RandomSampler(ds,
                                     replacement=replacement,
@@ -52,16 +57,15 @@ class LogitsDataloader:
                                     generator=generator)
         else:
             sampler = None
-        # pytorch lightning will add distributed sampler here automatically
-        # https://pytorch-lightning.readthedocs.io/en/0.9.0/multi_gpu.html#remove-samplers
-        ds = IterableDatasetWrapper(ds)
+            # fix ddp
+            # ds = ds.repeat(2).set_length(self.database.num_train_samples/num_processes/num_workers)
         dl = TorchLoader(
             dataset=ds,
             sampler=sampler,
             num_workers=self.num_workers,
             batch_size=self.batch_size,
-            drop_last=False,
-            persistent_workers=self.num_workers>0
+            drop_last=self.train_drop_last,
+            persistent_workers=self.num_workers>0 and self.persistent_workers
         )
         return dl
     
@@ -73,7 +77,7 @@ class LogitsDataloader:
             num_workers=self.num_workers,
             batch_size=self.batch_size,
             drop_last=False,
-            persistent_workers=self.num_workers>0,  # keep processes
+            persistent_workers=self.num_workers>0 and self.persistent_workers,  # keep processes
         )
         return dl
     
@@ -85,6 +89,6 @@ class LogitsDataloader:
             num_workers=self.num_workers,
             batch_size=self.batch_size,
             drop_last=False,
-            persistent_workers=self.num_workers>0,  # keep processes
+            persistent_workers=self.num_workers>0 and self.persistent_workers,  # keep processes
         )
         return dl
