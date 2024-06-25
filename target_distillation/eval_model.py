@@ -18,6 +18,7 @@ import padertorch
 def main(cfg):
     """
     python eval_model.py checkpoint=<path/to/checkpoint>
+    model=train model/arch@model.net=cp_mobile db=tau2022_logits_sd
     """
     print(OmegaConf.to_yaml(cfg))
     print(cfg.checkpoint)
