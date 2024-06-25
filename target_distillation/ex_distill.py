@@ -11,6 +11,7 @@ from target_distillation.lr_schedule import linear_warmup_linear_down, linear_wa
 
 
 from target_distillation.model import LightningModule
+from hydra.core.hydra_config import HydraConfig
 
 def get_schedule(num_epochs, config):
     warm_up_len = config["warm_up_len"]
@@ -34,8 +35,11 @@ def main(cfg: DictConfig):
     use `python ex_distill +ckpt_path="/path/to/state.ckpt"` to continue training
 
     cp_mobile model:
-    python ex_distill.py model/arch@model.net=cp_mobile
+    python ex_distill.py model/arch@model.net=cp_mobile model/arch@model.projection_layer=cp_mobile_projection_layer
+    python ex_distill.py model/arch@model.student=mobilenetv1 model/arch@model.projection_layer=mobilenetv1_projection_layer
     """
+    loc = HydraConfig.get().run.dir
+    print("Location:", loc)
 
     print(OmegaConf.to_yaml(cfg))
 
@@ -70,8 +74,10 @@ def main(cfg: DictConfig):
                 train_set,
                 validate_set,
                 ckpt_path=ckpt_path)
+    return loc
 
 if __name__ == "__main__":
     torch.set_float32_matmul_precision('high') # 'medium'
     # torch.multiprocessing.set_start_method('spawn')
-    main()
+    loc = main()
+
