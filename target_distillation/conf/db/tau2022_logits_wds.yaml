@@ -7,8 +7,8 @@ loader:
     _target_: target_distillation.data.tau2022.Tau2022LogitsWdsDataset
     logit_file: ${system.db_root}/logits/tau2022_ensemble_logits/database.json
     root_path: ${system.db_root}/wds/tau2022_32khz
-    validation_set: train_5  # test
-    train_set: train_5  # train_100
+    validation_set: test
+    train_set: train_100
   batch_size: ${loader.batch_size}
   num_workers: ${loader.num_workers}
   seed: 0

@@ -7,20 +7,30 @@ hydra:
   run:
     dir: ${system.storage_root}/${experiment_name}/${now:%Y-%m-%d}/${now:%H-%M-%S}
 loader:
-  batch_size: 30
+  batch_size: 256
   num_workers: 8
+# feature_extractor:
+#   _target_: EfficientAT.models.preprocess.AugmentMelSTFT
+#   sr: ${db.sample_rate}
+#   win_length: 800
+#   hopsize: 320
+#   n_mels: 128
+#   freqm: 48
+#   timem: 0
 feature_extractor:
-  _target_: EfficientAT.models.preprocess.AugmentMelSTFT
+  _target_: target_distillation.feature_extractor.LogMel
   sr: ${db.sample_rate}
-  win_length: 800
-  hopsize: 320
-  n_mels: 128
+  win_length: 3072
+  n_fft: 4096
+  hopsize: 500
+  n_mels: 256
   freqm: 48
   timem: 0
 
 optimizer:
   _target_: torch.optim.AdamW
-  lr: 8e-4
+  lr: 5e-3
+  # lr: 8e-4
   weight_decay: 0.0001
 trainer:
   _target_: pytorch_lightning.Trainer
@@ -37,11 +47,15 @@ trainer:
   gradient_clip_val: 1.0
   gradient_clip_algorithm: norm
 lr_schedule:
-  warm_up_len: 0.04
-  ramp_down_start: 0.4
-  ramp_down_len: 0.475
+  warm_up_len: 0.02
+  ramp_down_start: 0.02
+  ramp_down_len: 0.98
   last_lr_value: 0.01
-epochs: 100
+  # warm_up_len: 0.04
+  # ramp_down_start: 0.4
+  # ramp_down_len: 0.475
+  # last_lr_value: 0.01
+epochs: 150
 # num_iterations: 167000
 experiment_name: target_distillation
 # +ckpt_path: path/to/checkpoint

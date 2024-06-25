@@ -12,12 +12,21 @@ hydra:
 loader:
   batch_size: 64
   num_workers: 2
+# feature_extractor:
+#   _target_: EfficientAT.models.preprocess.AugmentMelSTFT
+#   sr: ${db.sample_rate}
+#   win_length: 800
+#   hopsize: 320
+#   n_mels: 128
+#   freqm: 0
+#   timem: 0
 feature_extractor:
-  _target_: EfficientAT.models.preprocess.AugmentMelSTFT
+  _target_: target_distillation.feature_extractor.LogMel
   sr: ${db.sample_rate}
-  win_length: 800
-  hopsize: 320
-  n_mels: 128
+  win_length: 3072
+  n_fft: 4096
+  hopsize: 500
+  n_mels: 256
   freqm: 0
   timem: 0
 experiment_name: target_distillation_eval

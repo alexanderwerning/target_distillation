@@ -1,0 +1,5 @@
+_target_: target_distillation.model_wrapper.ModelWrapper
+model:
+  _target_: dcase2024_task1_baseline.models.gsharp.mobilenet_v1
+  num_classes: ${db.num_classes}
+  return_feats: True
