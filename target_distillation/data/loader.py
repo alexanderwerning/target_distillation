@@ -37,7 +37,7 @@ class LogitsDataloader:
         if self.mixup is not None:
             mixup_ds = self.database.get_train_set()
             if self.augmentation is not None:
-                ds = ds.map(self.augmentation)
+                mixup_ds = mixup_ds.map(self.augmentation)
             # set dataset-specific attributes
             new_mixup = dataclasses.replace(self.mixup)
             new_mixup.mixup_ds = mixup_ds

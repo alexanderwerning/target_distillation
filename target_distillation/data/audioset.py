@@ -299,7 +299,7 @@ class AudiosetLogitsWdsDataset:
         logit_dict = {k: v for ds in self.db.values() for k, v in ds.items()}
 
         ds = (
-            wds.WebDataset(input_shards, nodesplitter=wds.split_by_node)
+            wds.WebDataset(input_shards, nodesplitter=wds.split_by_node, resampled=True)
             .shuffle(100)
             .decode(wds.torch_audio)
             .to_tuple("__key__", "flac", "json")
@@ -315,7 +315,7 @@ class AudiosetLogitsWdsDataset:
                 num_classes=self.num_classes,
                 logit_dict=logit_dict,
             )
-        )
+        ).with_epoch(160_000//8) # desired num examples: 160k/8workers
 
         return ds
         # pipeline = wds.DataPipeline(

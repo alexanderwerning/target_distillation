@@ -64,9 +64,12 @@ class Tau2022PickleDatabase(PickleDatabase):
     def add_target(self, examples):
         for ex in examples:
             # np array as hint for batching
-            if not isinstance(ex['label'], str):
-                print(ex)
-            ex["target"] = np.asarray(self.class_map[ex["label"]])
+            # if not isinstance(ex['label'], str):
+            #     print(ex)
+            if isinstance(ex["label"], str):
+                ex["target"] = np.asarray(self.class_map[ex["label"]])
+            else:
+                ex["target"] = np.asarray(ex["label"])
         return examples
 
     # 6k examples per pickle file
@@ -86,6 +89,8 @@ class Tau2022PickleDatabase(PickleDatabase):
 class Tau2022Dataset:
     root_path: str = db_root + "/tau2022_32khz_sd"
     validation_set: str = "test"
+    # eval set not published
+    eval_set: str = "test"
     train_set: str = "train_100"
     cache: bool = False
     dataset_names: List[str] = ("train_5", "train_10", "train_25", "train_50", "train_100", "test")  # , "evaluate"
@@ -115,6 +120,12 @@ class Tau2022Dataset:
 
     def get_validate_set(self):
         ds = self.get_dataset(self.validation_set)
+        if self.cache:
+            ds = lazy_dataset.from_list(list(ds), immutable_warranty="wu")
+        return ds
+    
+    def get_eval_set(self):
+        ds = self.get_dataset(self.eval_set)
         if self.cache:
             ds = lazy_dataset.from_list(list(ds), immutable_warranty="wu")
         return ds

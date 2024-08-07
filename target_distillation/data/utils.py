@@ -159,7 +159,7 @@ def pad_or_truncate(audio_data, length):
     audio_len = audio_data.shape[-1]
     if audio_len < length:
         # pad
-        return torch.pad(audio_data, ((0, 0), (0, length-audio_len)))
+        return torch.nn.functional.pad(audio_data, ((0, 0), (0, length-audio_len)))
     else:
         # truncate
         return audio_data[:, :length]
@@ -187,13 +187,16 @@ class Mixup:
         if self.mix_interval is None or torch.rand(1).item() < 1 / self.mix_interval:
             return ex
         ex2 = self._get_next()
-        l = self._dist.sample()
+        l = self._dist.sample().item()
         l = max(l, 1.0 - l)
         ex["audio_data"] = ex["audio_data"] - ex["audio_data"].mean()
         ex2["audio_data"] = ex2["audio_data"] - ex2["audio_data"].mean()
         x = ex["audio_data"] * l + ex2["audio_data"] * (1.0 - l)
         x = x - x.mean()
-        target = torch.maximum(ex["weak_targets"], ex["weak_targets"])
+        if isinstance(ex['weak_targets'], torch.Tensor):
+            target = torch.maximum(ex["weak_targets"], ex["weak_targets"])
+        else:
+            target = np.maximum(ex["weak_targets"], ex["weak_targets"])
         new_ex = {
             "audio_data": x,
             "weak_targets": target,

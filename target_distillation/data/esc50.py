@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import Optional
+import torch
 
 import lazy_dataset
 from distillation.data.linked_json import LinkedJsonDatabase
@@ -60,6 +61,13 @@ class Esc50Dataset:
     def get_validate_set(self):
         ds = self.get_dataset(self.validation_fold)
         ds = lazy_dataset.from_list(list(ds), immutable_warranty="wu")
+        return ds
+    
+    def get_eval_set(self):
+        # no eval, just (cross) validation
+        ds = self.get_dataset(self.validation_fold)
+        if self.cache:
+            ds = lazy_dataset.from_list(list(ds), immutable_warranty="wu")
         return ds
 
 
