@@ -1,0 +1,10 @@
+hydra-core
+pytorch_lightning
+paderbox
+webdataset
+distillation
+streaming_dataset
+lazy_dataset
+numpy
+torch
+pb_sed #remove
