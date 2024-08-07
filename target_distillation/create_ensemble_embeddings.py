@@ -81,6 +81,13 @@ def main(cfg: DictConfig):
         for i, batch in tqdm(enumerate(dataset), total=total):
             with torch.cuda.amp.autocast(), torch.no_grad():
                 batch = pt.data.example_to_device(batch, device)
+                if cfg.repeat:
+                    length = batch["audio_data"].shape[-1]
+                    desired_length = 32_000 * 10
+                    # assume sr=32khz, 10s desired length
+                    if length < desired_length:
+                        reps = desired_length // length + 1
+                        batch["audio_data"] = batch["audio_data"].repeat(1, 1, reps)[...,:desired_length]
                 features = fe(batch["audio_data"].squeeze(1))
                 logits, _ = model(features[:, None])
                 logits_ = logits.cpu().numpy()
