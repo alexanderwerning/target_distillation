@@ -55,23 +55,17 @@ def get_random_samples(samples, num):
 def to_torch(x_list):
     return torch.as_tensor(np.stack(x_list), dtype=torch.float32).cuda()
 
+
 @dataclass
 class LogitDataset:
     source_validation_split_size: float = 1/5
     balance: bool = True
-    target_db_path: str = json_root + "/esc50_32khz.json"
-    target_embedding_db_path: str = db_root + "/logits/esc50_ensemble_logits_full/database.json"
     source_embedding_db_path: str = db_root + "/relabeling/audioset_full/database.json"
-    validation_fold: int = 1
+    train_logits: list = None
+    validate_logits: list = None
 
     def __post_init__(self):
-        train_ds, validate_ds = prepare_datasets(validation_fold=self.validation_fold,
-                                                db_path=self.target_db_path,
-                                                embedding_db_path=self.target_embedding_db_path
-                                            )
-        target_train_logits = train_ds["logits"]
-        target_validate_logits = validate_ds["logits"]
-        self.train_positive_samples = {'logits': target_train_logits, 'target': np.ones(len(target_train_logits))}
+        self.train_positive_samples = {'logits': self.train_logits, 'target': np.ones(len(self.train_logits))}
 
         audioset_eval = LinkedJsonDatabase(self.source_embedding_db_path).data["datasets"]["eval"]
 
@@ -85,12 +79,12 @@ class LogitDataset:
                 source_train_logits.append(ex["logits"])
         source_train_logits = np.stack(source_train_logits)
         source_validate_logits = np.stack(source_validate_logits)
-        self.num_train_samples = len(target_train_logits)+len(source_train_logits)
+        self.num_train_samples = len(self.train_logits)+len(source_train_logits)
 
 
         self.train_negative_samples = {'logits': source_train_logits, 'target': np.zeros(len(source_train_logits))}
-        self.validate_set = {'logits': np.concatenate([source_validate_logits, target_validate_logits]),
-                            'target': np.concatenate([np.zeros(len(source_validate_logits)), np.ones(len(target_validate_logits))])}
+        self.validate_set = {'logits': np.concatenate([source_validate_logits, self.validate_logits]),
+                            'target': np.concatenate([np.zeros(len(source_validate_logits)), np.ones(len(self.validate_logits))])}
 
     def get_train_batch(self, batch_size, positive_mixup_rate=2.0):
         positive = get_random_samples(self.train_positive_samples, batch_size//2)

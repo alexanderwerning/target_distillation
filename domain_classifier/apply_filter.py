@@ -40,7 +40,7 @@ def get_index(ex):
 
 
 @click.command()
-@click.option("--logit_database_path", default=db_root + "/relabeling/audioset_logits_full")
+@click.option("--logit_database_path", default=db_root + "/relabeling/audioset_full")
 @click.option("--model_path", default="/net/vol/werning/storage/relabel_model/owl_peanuts_television/model.joblib")
 @click.option("--output_path", default=db_root + f"/relabeling/audioset_to_target_name/")
 @click.option("--num_workers", default=0)
