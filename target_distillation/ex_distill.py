@@ -1,17 +1,23 @@
 """Reproduce the results of the paper "Efficient Large-Scale Audio Tagging Via Transformer-To-CNN Knowledge Distillation"""
+
 # distill knowledge from strong teacher to efficient student
 import os
 import hydra
 import torch
 from hydra.utils import instantiate
 from omegaconf import DictConfig, OmegaConf
+import paderbox as pb
 
 from target_distillation.data.loader import LogitsDataloader
-from target_distillation.lr_schedule import linear_warmup_linear_down, linear_warmup_cosine_down
+from target_distillation.lr_schedule import (
+    linear_warmup_linear_down,
+    linear_warmup_cosine_down,
+)
 
 
 from target_distillation.model import LightningModule
 from hydra.core.hydra_config import HydraConfig
+
 
 def get_schedule(num_epochs, config):
     warm_up_len = config["warm_up_len"]
@@ -28,6 +34,7 @@ def get_schedule(num_epochs, config):
     )
     return sched_fn
 
+
 @hydra.main(version_base=None, config_path="conf", config_name="distill")
 def main(cfg: DictConfig):
     """Run training
@@ -42,6 +49,7 @@ def main(cfg: DictConfig):
     print("Location:", loc)
 
     print(OmegaConf.to_yaml(cfg))
+    pb.io.dump(OmegaConf.to_yaml(cfg), str(loc) + "/config.yaml")
 
     print("Get train set")
     db: LogitsDataloader = instantiate(cfg.db.loader)
@@ -55,29 +63,27 @@ def main(cfg: DictConfig):
     optimizer = opt_cls(
         lr=cfg.optimizer.lr,
         weight_decay=cfg.optimizer.weight_decay,
-        params = module.parameters()
+        params=module.parameters(),
     )
 
     lr_schedule = get_schedule(num_epochs=cfg.epochs, config=cfg.lr_schedule)
 
-    model = LightningModule(module,
-                            optimizer,
-                            lr_schedule=torch.optim.lr_scheduler.LambdaLR(optimizer=optimizer, 
-                                                                          lr_lambda=lr_schedule))
+    model = LightningModule(module, optimizer)  #!,
+    # lr_schedule=torch.optim.lr_scheduler.LambdaLR(optimizer=optimizer,
+    #                                             lr_lambda=lr_schedule))
+    print("No lr schedule active")
+
     trainer = instantiate(cfg.trainer)
     if "ckpt_path" in cfg:
         print("Resuming from checkpoint")
         ckpt_path = cfg.ckpt_path
     else:
         ckpt_path = None
-    trainer.fit(model,
-                train_set,
-                validate_set,
-                ckpt_path=ckpt_path)
+    trainer.fit(model, train_set, validate_set, ckpt_path=ckpt_path)
     return loc
 
+
 if __name__ == "__main__":
-    torch.set_float32_matmul_precision('high') # 'medium'
+    torch.set_float32_matmul_precision("high")  # 'medium'
     # torch.multiprocessing.set_start_method('spawn')
     loc = main()
-

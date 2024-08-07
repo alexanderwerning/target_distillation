@@ -21,10 +21,10 @@ def main(cfg):
     storage_dir = Path(HydraConfig.get().run.dir)
     print(storage_dir)
     print(cfg.checkpoint)
-    if cfg.checkpoint is None:
+    if cfg.checkpoint is None or cfg.checkpoint == "":
         print("No checkpoint given, use ImageNet init")
     else:
-        trainer_state_dict = torch.load(str(Path(storage_dir)/"checkpoints"/cfg.checkpoint))
+        trainer_state_dict = torch.load(cfg.checkpoint) #str(Path(storage_dir)/"checkpoints"/cfg.checkpoint))
         if "state_dict" in trainer_state_dict:
             model_state_dict = trainer_state_dict["state_dict"]
         elif "model" in trainer_state_dict:
@@ -42,13 +42,14 @@ def main(cfg):
         else:
             raise ValueError(f"Key prefix unknown: {some_key}")
         student_state_dict = {k[len(student_key_prefix):]: v for k, v in model_state_dict.items() if k.startswith(student_key_prefix)}
+        (Path(storage_dir)/"checkpoints").mkdir(exist_ok=True)
         torch.save(student_state_dict, str(Path(storage_dir)/"checkpoints/student_ckpt_latest.pth"))
         
         cfg.model.net.model.pretrained_name = str(Path(storage_dir)/"checkpoints/student_ckpt_latest.pth")
     
     db: LogitsDataloader = instantiate(cfg.db.loader)
-    num_samples = 1600
-    train_set = db.get_train_set(replacement=True, num_samples=num_samples)
+    # num_samples = 1600
+    train_set = db.get_train_set() #replacement=True, num_samples=num_samples)
     validate_set = db.get_validate_set()
 
     module = instantiate(cfg.model)
