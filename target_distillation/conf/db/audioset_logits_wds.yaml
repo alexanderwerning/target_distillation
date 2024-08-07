@@ -18,7 +18,7 @@ loader:
     gain_augment: 0
     roll_axis: 1
     shift: null
-    shift_range: 10000
+    shift_range: 160000
   mixup:
     _target_: target_distillation.data.utils.Mixup
     mix_interval: 2.0
