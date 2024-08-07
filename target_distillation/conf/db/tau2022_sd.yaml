@@ -8,6 +8,7 @@ loader:
     root_path: ${system.db_root}/tau2022_32khz_sd
     validation_set: test
     train_set: train_100
+    cache: true
   batch_size: ${loader.batch_size}
   num_workers: ${loader.num_workers}
   seed: 0
