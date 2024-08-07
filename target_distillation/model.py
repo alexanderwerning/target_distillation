@@ -94,6 +94,7 @@ class LightningModule(L.LightningModule):
         self.optimizer = optimizer
         self.lr_schedule = lr_schedule
         self.validation_summary = empty_summary_dict()
+        self.test_summary = empty_summary_dict()
     
     def training_step(self, batch, batch_idx):
         out = self.model(batch)
@@ -129,6 +130,25 @@ class LightningModule(L.LightningModule):
         if "loss" in summary:
             summary.pop("loss")
         update_summary(self.validation_summary, summary)
+
+    # def test_step(self, batch, batch_idx):
+    #     out = self.model(batch)
+    #     batch_size = batch['audio_data'].shape[0]
+    #     summary = self.model.review(batch, out)
+    #     val_loss = summary['loss']
+    #     self.log("test/loss",
+    #              val_loss,
+    #              sync_dist=True,
+    #              batch_size=batch_size)
+    #     for k, v in summary['scalars'].items():
+    #         name = f"test/{k}"
+    #         self.log(name,
+    #                  v,
+    #                  sync_dist=True,
+    #                  batch_size=batch_size)
+    #     if "loss" in summary:
+    #         summary.pop("loss")
+    #     update_summary(self.test_summary, summary)
     
     def on_validation_epoch_end(self) -> None:
         super().on_validation_epoch_end()
@@ -144,6 +164,21 @@ class LightningModule(L.LightningModule):
             self.log(name,
                      v,
                      sync_dist=True)
+    
+    # def on_test_epoch_end(self) -> None:
+    #     super().on_test_epoch_end()
+    #     summary = _modify_summary(self.model, self.test_summary)
+
+    #     if "loss" in summary['scalars']:
+    #         summary['scalars'].pop("loss")
+    #     self.test_summary = empty_summary_dict()
+    #     for k, v in summary['scalars'].items():
+    #         if isinstance(v, list):
+    #             continue
+    #         name = f"test/{k}"
+    #         self.log(name,
+    #                  v,
+    #                  sync_dist=True)
 
     
     def configure_optimizers(self):
