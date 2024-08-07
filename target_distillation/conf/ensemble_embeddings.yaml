@@ -1,6 +1,6 @@
 defaults:
   - _self_
-  - db: tau22_sd
+  - db: tau2022_sd
   - system: nt
 hydra:
   run:
@@ -26,6 +26,7 @@ model:
     - ["passt_s_swa_p16_s14_128_ap471", 14, 14]
     - ["passt_s_swa_p16_s16_128_ap473", 16, 16]
     - ["passt_s_p16_s16_128_ap468", 16, 16]
+repeat: False
 experiment_name: target_distillation
 segment_length: null
 dir_path: /net/vol/werning/db/tau2022_ensemble_logits
