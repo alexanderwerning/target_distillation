@@ -1,0 +1,23 @@
+num_classes: 88
+sample_rate: 32000
+num_train_samples: 4000
+loader:
+  _target_: target_distillation.data.loader.LogitsDataloader
+  database:
+    _target_: target_distillation.data.nsynth.NsynthLogitsDataset
+    root_path: ${system.db_root}/logits/nsynth_ensemble_logits_full/database.json
+    validation_set: valid
+    train_set: train
+  batch_size: ${loader.batch_size}
+  num_workers: ${loader.num_workers}
+  seed: 0
+  augmentation: 
+    _target_: target_distillation.data.utils.Augmentation
+    gain_augment: 0
+    roll_axis: 1
+    shift: null
+    shift_range: 12800
+    mixstyle_p: 0  # 0.3
+    mixstyle_alpha: 0  # 0.4
+  mixup:
+    null
