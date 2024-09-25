@@ -1,6 +1,9 @@
 This repository contains the code used in the paper ["Target-specific Dataset Pruning for Compression of Audio Tagging Models"](https://eurasip.org/Proceedings/Eusipco/Eusipco2024/pdfs/0000061.pdf)
 
 The proposed method combines model compression and domain adaptation to obtain better efficient audio tagging models.
+It consists of three steps: Data pruning, knowledge distillation and a final fine-tuning.
+
+![image](images/method.png)
 
 ## Installation
 Install requirements manually from requirements.txt and install the package.
