@@ -4,7 +4,7 @@ import padertorch as pt
 import torch
 from tqdm import tqdm
 
-from distillation.data.linked_json import LinkedJsonDatabase
+from target_distillation.util.linked_json import LinkedJsonDatabase
 from itertools import islice
 import hydra
 from hydra.utils import instantiate
