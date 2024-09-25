@@ -295,7 +295,15 @@ class AudiosetLogitsWdsDataset:
         eval_path = self._get_subset_path("eval")
         return [str(p) for p in eval_path.glob("*.tar")]
 
-    def get_dataset(self, input_shards):
+    def get_dataset(self, name_or_shards):
+        if isinstance(name_or_shards, str):
+            dataset_path = self._get_subset_path(name_or_shards)
+            shards = [str(p) for p in dataset_path.glob("*.tar")]
+        else:
+            shards = name_or_shards
+        return self._get_dataset(shards)
+
+    def _get_dataset(self, input_shards):
         logit_dict = {k: v for ds in self.db.values() for k, v in ds.items()}
 
         ds = (
@@ -350,6 +358,9 @@ class AudiosetLogitsWdsDataset:
             )
         )
         return ds
+    
+    def get_dataset_names(self):
+        return ["balanced_train", "unbalanced_train", "eval"]
 
     def get_train_set(self):
         return self.get_dataset(self.get_train_shards())
