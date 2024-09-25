@@ -3,7 +3,7 @@
 import hydra
 from hydra.utils import instantiate
 from omegaconf import DictConfig, OmegaConf
-from padertorch.contrib.aw.utils import str_nested_shape_maybe
+from target_distillation.util.nested_op import str_nested_shape_maybe
 
 import torch
 
