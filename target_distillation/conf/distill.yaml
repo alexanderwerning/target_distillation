@@ -9,43 +9,50 @@ hydra:
 loader:
   batch_size: 256
   num_workers: 8
+feature_extractor:
+  _target_: EfficientAT.models.preprocess.AugmentMelSTFT
+  sr: ${db.sample_rate}
+  win_length: 800
+  hopsize: 320
+  n_mels: 128
+  freqm: 48
+  timem: 192
 # feature_extractor:
-#   _target_: EfficientAT.models.preprocess.AugmentMelSTFT
+#   _target_: target_distillation.feature_extractor.LogMel
 #   sr: ${db.sample_rate}
-#   win_length: 800
-#   hopsize: 320
-#   n_mels: 128
+#   win_length: 3072
+#   n_fft: 4096
+#   hopsize: 500
+#   n_mels: 256
 #   freqm: 48
 #   timem: 0
-feature_extractor:
-  _target_: target_distillation.feature_extractor.LogMel
-  sr: ${db.sample_rate}
-  win_length: 3072
-  n_fft: 4096
-  hopsize: 500
-  n_mels: 256
-  freqm: 48
-  timem: 0
 
 optimizer:
   _target_: torch.optim.AdamW
-  lr: 5e-3
+  lr: 5e-4
   # lr: 8e-4
   weight_decay: 0.0001
 trainer:
   _target_: pytorch_lightning.Trainer
+  default_root_dir: ${hydra:run.dir}
   accelerator: "gpu"
   num_nodes: 1
   logger:
     _target_: lightning.pytorch.loggers.TensorBoardLogger
     save_dir: ${hydra:run.dir}
     name: ${experiment_name}
+    # _target_: lightning.pytorch.loggers.WandbLogger
+    # project: dcase_workshop2024
   strategy: ddp
-  # limit_train_batches: ${num_iterations}
+  max_steps: ${num_iterations}
   precision: 32
   max_epochs: ${epochs}
   gradient_clip_val: 1.0
   gradient_clip_algorithm: norm
+  callbacks:
+    - _target_: pytorch_lightning.callbacks.ModelCheckpoint
+      every_n_train_steps: 25000
+      save_top_k: -1
 lr_schedule:
   warm_up_len: 0.02
   ramp_down_start: 0.02
@@ -55,7 +62,10 @@ lr_schedule:
   # ramp_down_start: 0.4
   # ramp_down_len: 0.475
   # last_lr_value: 0.01
-epochs: 150
-# num_iterations: 167000
+# epochs: -1
+epochs: 50
+# 5000it*32batchsize*4devices=50epochs
+num_iterations: 250000
 experiment_name: target_distillation
+
 # +ckpt_path: path/to/checkpoint

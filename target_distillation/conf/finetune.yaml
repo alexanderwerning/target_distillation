@@ -11,37 +11,40 @@ hydra:
     dir: ${system.storage_root}/${experiment_name}/${now:%Y-%m-%d}/${now:%H-%M-%S}
 loader:
   batch_size: 64
-  num_workers: 2
-# feature_extractor:
-#   _target_: EfficientAT.models.preprocess.AugmentMelSTFT
-#   sr: ${db.sample_rate}
-#   win_length: 800
-#   hopsize: 320
-#   n_mels: 128
-#   freqm: 0
-#   timem: 0
+  num_workers: 1
 feature_extractor:
-  _target_: target_distillation.feature_extractor.LogMel
+  _target_: EfficientAT.models.preprocess.AugmentMelSTFT
   sr: ${db.sample_rate}
-  win_length: 3072
-  n_fft: 4096
-  hopsize: 500
-  n_mels: 256
-  freqm: 48
+  win_length: 800
+  hopsize: 320
+  n_mels: 128
+  freqm: 0
   timem: 0
+# feature_extractor:
+#   _target_: target_distillation.feature_extractor.LogMel
+#   sr: ${db.sample_rate}
+#   win_length: 3072
+#   n_fft: 4096
+#   hopsize: 500
+#   n_mels: 256
+#   freqm: 48
+#   timem: 0
 optimizer:
   _target_: torch.optim.AdamW
   lr: 1e-5
   weight_decay: 0.0001
 trainer:
   _target_: pytorch_lightning.Trainer
+  default_root_dir: ${hydra:run.dir}
   accelerator: "gpu"
   devices: 1
   num_nodes: 1
   logger:
-    _target_: lightning.pytorch.loggers.TensorBoardLogger
-    save_dir: ${hydra:run.dir}
-    name: ${experiment_name}
+    # _target_: lightning.pytorch.loggers.TensorBoardLogger
+    # save_dir: ${hydra:run.dir}
+    # name: ${experiment_name}
+    _target_: lightning.pytorch.loggers.WandbLogger
+    project: dcase_workshop2024_ft
   # strategy: ddp
   precision: 32
   max_epochs: ${epochs}
@@ -52,6 +55,6 @@ lr_schedule:
   ramp_down_start: 0.4
   ramp_down_len: 0.4
   last_lr_value: 0.01
-epochs: 50
+epochs: 100
 experiment_name: target_distillation_ft
 checkpoint: null

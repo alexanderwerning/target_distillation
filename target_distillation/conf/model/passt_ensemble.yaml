@@ -1,0 +1,11 @@
+_target_: passt_pt.models.passt.get_ensemble_model
+arch_list:
+  - ["passt_s_swa_p16_128_ap476", 10, 10]
+  - ["passt_s_swa_p16_128_ap4761", 10, 10]
+  - ["passt_s_p16_128_ap472", 10, 10]
+  - ["passt_s_p16_s12_128_ap470", 12, 12]
+  - ["passt_s_swa_p16_s12_128_ap473", 12, 12]
+  - ["passt_s_p16_s14_128_ap469", 14, 14]
+  - ["passt_s_swa_p16_s14_128_ap471", 14, 14]
+  - ["passt_s_swa_p16_s16_128_ap473", 16, 16]
+  - ["passt_s_p16_s16_128_ap468", 16, 16]

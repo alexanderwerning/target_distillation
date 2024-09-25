@@ -1,0 +1,5 @@
+_target_: EfficientAT.models.preprocess.AugmentMelSTFT
+sr: ${db.sample_rate}
+win_length: 800
+hopsize: 320
+n_mels: 128
