@@ -21,6 +21,15 @@ class Esc50PickleDatabase(PickleDatabase):
         ds = list(ds)
         return ds
 
+esc50_classes = ['airplane', 'breathing', 'brushing_teeth', 'can_opening', 'car_horn', 'cat',
+                 'chainsaw', 'chirping_birds', 'church_bells', 'clapping', 'clock_alarm', 'clock_tick',
+                 'coughing', 'cow', 'crackling_fire', 'crickets', 'crow', 'crying_baby', 'dog',
+                 'door_wood_creaks', 'door_wood_knock', 'drinking_sipping', 'engine', 'fireworks',
+                 'footsteps', 'frog', 'glass_breaking', 'hand_saw', 'helicopter', 'hen', 'insects',
+                 'keyboard_typing', 'laughing', 'mouse_click', 'pig', 'pouring_water', 'rain', 'rooster',
+                 'sea_waves', 'sheep', 'siren', 'sneezing', 'snoring', 'thunderstorm', 'toilet_flush',
+                 'train', 'vacuum_cleaner', 'washing_machine', 'water_drops', 'wind']
+
 
 @dataclass
 class Esc50Dataset:
@@ -33,6 +42,7 @@ class Esc50Dataset:
         self.db = Esc50PickleDatabase(
             json_path=self.root_path + "/database.json", root_dir=self.root_path
         )
+        self.class_map = {c: i for i, c in enumerate(esc50_classes)}
     
     def _fold_to_name(self, fold_idx):
         # folds: ["fold01", "fold02", "fold03", "fold04", "fold05"]
