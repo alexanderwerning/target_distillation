@@ -1,10 +1,13 @@
-hydra-core
-pytorch_lightning
 paderbox
-webdataset
-distillation
-streaming_dataset
 lazy_dataset
+padertorch
+streaming_dataset
+pb_sed
+tqdm
+pathlib
 numpy
 torch
-pb_sed #remove
+torchaudio
+hydra-core
+pytorch_lightning
+webdataset
