@@ -1,7 +1,9 @@
 paderbox
 lazy_dataset
 padertorch
-streaming_dataset
+streaming_dataset @ git+https://github.com/alexanderwerning/streaming_dataset
+EfficientAT @ git+https://github.com/alexanderwerning/EfficientAT
+passt_pt @ git+https://github.com/alexanderwerning/passt_pt
 pb_sed
 tqdm
 pathlib
