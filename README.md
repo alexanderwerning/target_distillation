@@ -1,9 +1,12 @@
 This repository contains the code used in the paper ["Target-specific Dataset Pruning for Compression of Audio Tagging Models"](https://eurasip.org/Proceedings/Eusipco/Eusipco2024/pdfs/0000061.pdf)
 
+
 The proposed method combines model compression and domain adaptation to obtain better efficient audio tagging models.
 It consists of three steps: Data pruning, knowledge distillation and a final fine-tuning.
 
 ![image](images/method.png)
+
+This method was used for a [submission](https://dcase.community/documents/challenge2024/technical_reports/DCASE2024_Werning_48_t1.pdf) to [Task 1 of the DCASE Challenge 2024](https://dcase.community/challenge2024/task-data-efficient-low-complexity-acoustic-scene-classification)
 
 ## Installation
 Install requirements manually from the `requirements.txt` and install the package.
