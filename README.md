@@ -25,3 +25,8 @@ Use the `ex_distill.py` script to distill a model, a fine-tuning is automaticall
 
 
 If there are some missing files or packages, please let me know.
+
+
+---
+Acknowledgement
+The project was funded by the Federal Ministry of Education and Research (BMBF) under grant no. 01IS22094E WEST-AI.
