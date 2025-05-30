@@ -6,20 +6,22 @@ It consists of three steps: Data pruning, knowledge distillation and a final fin
 ![image](images/method.png)
 
 ## Installation
-Install requirements manually from requirements.txt and install the package.
+Install requirements manually from the `requirements.txt` and install the package.
+
+Make sure to  modify the system path configuration or add your own in `target\_distillation/conf/system/*.yaml`
 
 ## Data preparation
 Refer to [audio-data](https://github.com/LAION-AI/audio-dataset) to obtain a webdataset version of [AudioSet](https://research.google.com/audioset/).
 ESC-50 can be downloaded [here](https://github.com/karolpiczak/ESC-50?tab=readme-ov-file#download).
-Create logit datasets for both AudioSet and the target datasets using target\_distillation/create\_ensemble\_embeddings.py.
+Create logit datasets for both AudioSet and the target datasets using `target\_distillation/create\_ensemble\_embeddings.py`.
 
 
 ## Domain classifier training
-The notebook in domain\_classifier allows to train a domain classifier model for a given dataset. For new datasets, a dataset class needs to be added in target\_distillation/data.
+The notebook in `domain\_classifier` allows to train a domain classifier model for a given dataset. For new datasets, a dataset class needs to be added in `target\_distillation/data`.
 
 ## Model distillation
-With the trained domain classifier, AudioSet can be filtered using the create_wds.py script.
-Use the ex_distill.py script to distill a model, a fine-tuning is automatically performed after the training is finished.
+With the trained domain classifier, AudioSet can be filtered using the `create_wds.py` script.
+Use the `ex_distill.py` script to distill a model, a fine-tuning is automatically performed after the training is finished.
 
 
 If there are some missing files or packages, please let me know.
